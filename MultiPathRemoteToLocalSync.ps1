@@ -5,36 +5,45 @@ WinSCP - MultiPath Remote to Local Sync
 
 .DESCRIPTION
 	      Originally based off the functionality of KeepLocalUpToDate.WinSCPextension.ps1 script which is provided in the 
-	extension folder of WinSCP 5.9.2+. To improve the ability of a closed functionality script, rewrote the enitire thing in
+	extension folder of WinSCP 5.9.2+. To improve the ability of the closed functionality script, rewrote the enitire thing in
 	powershell, besides the last part, syncing, which will eventually be rewriten as well. At this point it will take input of
 	multiple folders, local and remote, that are accepted as pairs. Each pair will sync between and allow the contents of the
 	remote to be sync'd to the local. There is a interval that allows the script to continuously run and have a delay between
 	session of checking the folders provided. It will also disconnect and reconnect between each session, to ensure the
 	connection maintains and does not drop at any point. This still uses the 
     
-.PARAMETER ####################
-          ####################
-.PARAMETER ####################
-	       ####################
-.PARAMETER  ####################
-          ####################
-.PARAMETER  ####################
-	        ####################
-.PARAMETER  ####################
-          ####################
-.PARAMETER ####################
-	         ####################
-        
-.PARAMETER ####################
-         ####################                
-.PARAMETER ####################
-          ####################
+.PARAMETER multiplePaths
+          	Input for multiple local and remote paths. Each pair needs a local and remote path which will have the local listed 
+		first with the remote path immediately after. 
+	  	(i.e. "B:\Backup\SYS\","/SYS/","B:\Backup\PROC\","/PROC/","B:\Backup\Docs\","/Users/TestUser/Documents/")
+.PARAMETER sessionProtocol
+	       Protocol to be used to connect with. (i.e. FTP, SFTP, SCP, HTTP, HTTPS)
+.PARAMETER sessionHostName
+          	HostName of the remote server. (i.e. ftp.testserver.com)
+.PARAMETER sessionUserName
+	 	UserName of the account on the remote server.
+.PARAMETER sessionPassword
+		Password of the account on the remote server.
+.PARAMETER sessionSSHHostKeyFingerprint
+	        SSH Host Key of the remote server, used in along with secure connections, SFTP or SCP        
+.PARAMETER localPath
+         	Local path if only one path is going to be synchronized.
+.PARAMETER remotePath
+		Remote path of only one path is going to be synchronized.
+.PARAMETER interval
+		Amount in seconds to pause between synchronization loops, that allows the script to be cancelled with Ctrl-C.		
 
 .EXAMPLE
-          ####################
-          ####################
+          ./MultiPathRemoteToLocalSync.ps1 -multiplePaths "B:\Backup\SYS\","/SYS/","B:\Backup\PROC\","/PROC/" -sessionProtocol ftp
+	  	-sessionHostName ftp.testserver.com -sessionUserName TestUser -sessionPassword TestPASSWORD
+          
+	  ./MultiPathRemoteToLocalSync.ps1 -sessionProtocol ftp -sessionHostName ftp.testserver.com -sessionUserName TestUser 
+	  
+	  ./MultiPathRemoteToLocalSync.ps1 -verbose 
+	  
 .NOTES
-	        With the initial version of this script it setup for 3 remote/local folders that are manually set through parameters. The 
+	        
+		With the initial version of this script it setup for 3 remote/local folders that are manually set through parameters. The 
           original WinSCP script and documentation - https://winscp.net/eng/docs/library_example_keep_local_directory_up_to_date 
 .LINK
 	        https://github.com/delta911turbo/MultiPathRemoteToLocalSync
@@ -47,7 +56,7 @@ Param(
         [String[]] $multiplePaths, ## Multiple path input format:  "localpath1","remotepath1","localpath2","remotepath2" ##
     [Parameter(Mandatory = $True, ValueFromPipeline=$true)]
     [ValidateScript({ (($PsItem -eq "ftp") -or ($PsItem -eq "sftp") -or ($PsItem -eq "scp") -or ($PsItem -eq "webdev")) })]  ## Verifies input is a valid protocol ##
-        $sessionProtocol,  ## Valid protocols:  ftp, sftp, scp, webdav ##
+        $sessionProtocol,  ## Valid protocols:  ftp, sftp, scp, http, https ##
     [Parameter(Mandatory = $True, ValueFromPipeline=$true)]
     [ValidateScript({ (($PsItem -ne $null) -and ($PsItem -ne [String]::Empty)) })] ## Verifies input was not NULL ##
         $sessionHostName,
@@ -56,7 +65,7 @@ Param(
         $sessionUserName,
     [Parameter(Mandatory = $True, ValueFromPipeline=$true)]
         $sessionPassword,
-    [parameter(Mandatory=$true, ValueFromPipeline=$true)]
+    [parameter(Mandatory=$false, ValueFromPipeline=$true)]
         $sessionSSHHostKeyFingerprint,
     [parameter(Mandatory=$true, ValueFromPipeline=$true)]
          $localPath,
@@ -74,7 +83,7 @@ Write-Verbose "Username: $sessionUserName"
 Write-Verbose "Password: $sessionPassword"
 Write-Verbose "Localpath: $localPath"
 Write-Verbose "Remotepath: $remotePath"
-Write-Verbose "SSHHostKeyFingerprint: $sessionSSHHostKeyFingerprint `n"
+Write-Verbose "SSHHostKeyFingerprint: $sessionSSHHostKeyFingerprint"
 
 function DataValidation {
 
@@ -193,12 +202,26 @@ Add-Type -Path "..\WinSCPnet.dll"
 $i =9 
 While ($i -gt 8) {
 
-    $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
-        Protocol = [WinSCP.Protocol]::$sessionProtocol
-        HostName = $sessionHostName
-        UserName = $sessionUserName
-        Password = $sessionPassword
+    if ($sessionSSHHostKeyFingerprint) {
+    	
+	$sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+        	Protocol = [WinSCP.Protocol]::$sessionProtocol
+        	HostName = $sessionHostName
+        	UserName = $sessionUserName
+        	Password = $sessionPassword
+		SSHHostKeyFingerprint = $sessionSSHHostKeyFingerprint
+    	}
+	
+    } else {
+    
+    	$sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+        	Protocol = [WinSCP.Protocol]::$sessionProtocol
+        	HostName = $sessionHostName
+        	UserName = $sessionUserName
+        	Password = $sessionPassword
+    	}
     }
+   
     
     $session = New-Object WinSCP.Session
 
